@@ -1,0 +1,28 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - echo Entered the build phase...
+      - echo Build started on `date`
+  post_build:
+    commands:
+      # Populate parameters for the next step, which is the CloudFormation stack.
+      # Ideally these should be set as env vars (or in the case of the AMI, produced
+      # in this step if we're going with the Golden AMI route).
+      - |
+        echo '{"Parameters": {"AmiId": "ami-0d648a398d3fe531b", "KeyName": "cafonsop-dub", "SubnetId": "subnet-082e7bd6d07aaf0f9", "VpcId": "vpc-0c36b2614399479e7"}}' > cfn_config.json
+
+artifacts:
+  secondary-artifacts:
+    BuildArtifact:
+      files:
+        - src/**/*
+        - appspec.yml
+        - buildspec.deploy.yml
+      discard-paths: no
+    CfnEnvironmentStack:
+      files:
+        - templates/environment.yaml
+        - cfn_config.json
+      discard-paths: yes

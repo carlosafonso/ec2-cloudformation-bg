@@ -1,0 +1,38 @@
+version: 0.2
+
+phases:
+  build:
+    commands:
+      - echo Entered the build phase...
+      - echo Build started on `date`
+      - echo $CODEBUILD_SOURCE_VERSION
+
+      # Obtain S3 bucket and key where the build artifact is stored
+      - APP_REVISION_BUCKET=`echo $CODEBUILD_SOURCE_VERSION | cut -d/ -f1 | sed s/arn:aws:s3::://g`
+      - APP_REVISION_KEY=`echo $CODEBUILD_SOURCE_VERSION | cut -d/ -f2-`
+
+      # Create a new CodeDeploy deployment and wait until it completes
+      - |
+        aws deploy create-deployment \
+          --application-name $APP_CODEDEPLOY_APP \
+          --deployment-group-name $APP_CODEDEPLOY_GROUP \
+          --s3-location bucket=$APP_REVISION_BUCKET,key=$APP_REVISION_KEY,bundleType=zip \
+          --target-instances autoScalingGroups=$APP_ASG > deployment.json
+      - cat deployment.json
+      - aws deploy wait deployment-successful --deployment-id $(jq -r .deploymentId < deployment.json)
+
+      # Retrieve old environment stack name, if any
+      - aws ssm get-parameter --name /ec2-cloudformation-bg/current-environment-stack-name > param.json
+      - cat param.json
+
+      # Store new environment stack name
+      - |
+        aws ssm put-parameter \
+          --name /ec2-cloudformation-bg/current-environment-stack-name \
+          --value $APP_NEW_ENV_CFN_STACK \
+          --overwrite
+
+      # Delete old CloudFormation stack
+      - OLD_ENV_STACK_NAME=$(jq -r .Parameter.Value < param.json)
+      - aws cloudformation delete-stack --stack-name $OLD_ENV_STACK_NAME
+      - aws cloudformation wait stack-delete-complete --stack-name $OLD_ENV_STACK_NAME
