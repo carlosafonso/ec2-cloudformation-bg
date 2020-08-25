@@ -1,0 +1,89 @@
+Parameters:
+  AmiId:
+    Description: The ID of the AMI to use in the instances
+    Type: AWS::EC2::Image::Id
+  InstanceType:
+    Type: String
+    Default: t3.medium
+  KeyName:
+    Description: The name of the SSH key pair to connect to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+
+
+Resources:
+  #
+  # Section:
+  #
+  InstanceProfileRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [!Ref InstanceProfileRole]
+
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for the environment instances
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+      VpcId: !Ref VpcId
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateData:
+        IamInstanceProfile:
+          Name: !Ref InstanceProfile
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            DeviceIndex: 0
+            Groups:
+              - !Ref InstanceSecurityGroup
+            # SubnetId: !Ref SubnetId
+        # SecurityGroupIds:
+        #   - !Ref InstanceSecurityGroup
+
+  AutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      # AvailabilityZones:
+      #   - !Select
+      #     - 0
+      #     - Fn::GetAZs: !Ref 'AWS::Region'
+      DesiredCapacity: 1
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MaxSize: 1
+      MinSize: 1
+      VPCZoneIdentifier:
+        - !Ref SubnetId
+  #
+  # End of Section:
+  #
