@@ -1,3 +1,4 @@
+```
 export CFN_ARTIFACTS_BUCKET=<your-bucket-name>
 
 # Create an S3 bucket for storing the processed templates, if you don't have
@@ -15,3 +16,4 @@ aws cloudformation deploy \
 	--stack-name ec2-cloudformation-bg \
 	--template-file ./templates/processed.yaml \
 	--capabilities CAPABILITY_IAM
+```
